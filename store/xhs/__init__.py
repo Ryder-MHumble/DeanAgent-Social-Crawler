@@ -28,6 +28,7 @@ from var import source_keyword_var
 
 from .xhs_store_media import *
 from ._store_impl import *
+from store.supabase_store_impl import XhsSupabaseStoreImplement
 
 
 class XhsStoreFactory:
@@ -39,6 +40,7 @@ class XhsStoreFactory:
         "sqlite": XhsSqliteStoreImplement,
         "mongodb": XhsMongoStoreImplement,
         "excel": XhsExcelStoreImplement,
+        "supabase": XhsSupabaseStoreImplement,
     }
 
     @staticmethod

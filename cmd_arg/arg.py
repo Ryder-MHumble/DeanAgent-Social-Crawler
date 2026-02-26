@@ -74,6 +74,7 @@ class SaveDataOptionEnum(str, Enum):
     MONGODB = "mongodb"
     EXCEL = "excel"
     POSTGRES = "postgres"
+    SUPABASE = "supabase"
 
 
 class InitDbOptionEnum(str, Enum):

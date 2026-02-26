@@ -20,6 +20,23 @@
 # Basic configuration
 PLATFORM = "xhs"  # Platform, xhs | dy | ks | bili | wb | tieba | zhihu
 KEYWORDS = "编程副业,编程兼职"  # Keyword search configuration, separated by English commas
+
+# ==================== Content Relevance Filter ====================
+# Enable to filter out content that doesn't actually mention the target entities.
+# Platform search is fuzzy — "中关村人工智能研究院" returns lots of generic AI content.
+# When enabled, only content containing at least one RELEVANCE_MUST_CONTAIN keyword
+# in its title or description will be saved. Comments are saved only if their parent
+# content passed the filter.
+ENABLE_RELEVANCE_FILTER = True
+
+# Content MUST contain at least one of these strings (case-insensitive for English)
+# to be considered relevant. These should be the core entity names you care about.
+RELEVANCE_MUST_CONTAIN = [
+    "中关村人工智能研究院",
+    "中关村学院",
+    "北京中关村学院",
+    "中关村AI研究院",
+]
 LOGIN_TYPE = "qrcode"  # qrcode or phone or cookie
 COOKIES = ""
 CRAWLER_TYPE = (
@@ -67,11 +84,12 @@ CDP_HEADLESS = False
 BROWSER_LAUNCH_TIMEOUT = 60
 
 # Whether to automatically close the browser when the program ends
-# Set to False to keep the browser running for easy debugging
-AUTO_CLOSE_BROWSER = True
+# Set to False to keep the browser running, preserving cookies and login state across runs
+AUTO_CLOSE_BROWSER = False
 
-# Data saving type option configuration, supports six types: csv, db, json, sqlite, excel, postgres. It is best to save to DB, with deduplication function.
-SAVE_DATA_OPTION = "json"  # csv or db or json or sqlite or excel or postgres
+# Data saving type option configuration. It is best to save to DB, with deduplication function.
+# Supported: csv | db | json | sqlite | excel | postgres | mongodb | supabase
+SAVE_DATA_OPTION = "supabase"  # csv or db or json or sqlite or excel or postgres or mongodb or supabase
 
 # Data saving path, if not specified by default, it will be saved to the data folder.
 SAVE_DATA_PATH = ""
@@ -82,10 +100,11 @@ USER_DATA_DIR = "%s_user_data_dir"  # %s will be replaced by platform name
 # The number of pages to start crawling starts from the first page by default
 START_PAGE = 1
 
-# Control the number of crawled videos/posts
-CRAWLER_MAX_NOTES_COUNT = 15
+# Control the number of crawled videos/posts per keyword per run
+# Keep this low (10-20) to avoid triggering anti-bot detection
+CRAWLER_MAX_NOTES_COUNT = 10
 
-# Controlling the number of concurrent crawlers
+# Controlling the number of concurrent crawlers (1 = safest, looks most human-like)
 MAX_CONCURRENCY_NUM = 1
 
 # Whether to enable crawling media mode (including image or video resources), crawling media is not enabled by default
@@ -95,10 +114,11 @@ ENABLE_GET_MEIDAS = False
 ENABLE_GET_COMMENTS = True
 
 # Control the number of crawled first-level comments (single video/post)
-CRAWLER_MAX_COMMENTS_COUNT_SINGLENOTES = 10
+# Keep moderate to avoid excessive requests per post
+CRAWLER_MAX_COMMENTS_COUNT_SINGLENOTES = 5
 
 # Whether to enable the mode of crawling second-level comments. By default, crawling of second-level comments is not enabled.
-# If the old version of the project uses db, you need to refer to schema/tables.sql line 287 to add table fields.
+# Enabling this significantly increases request volume — higher ban risk
 ENABLE_GET_SUB_COMMENTS = False
 
 # word cloud related
@@ -117,8 +137,9 @@ STOP_WORDS_FILE = "./docs/hit_stopwords.txt"
 # Chinese font file path
 FONT_PATH = "./docs/STZHONGS.TTF"
 
-# Crawl interval
-CRAWLER_MAX_SLEEP_SEC = 2
+# Crawl interval (seconds) — random sleep between requests
+# Higher = safer. Recommended: 3-5 for normal use, 5-10 if you've been warned
+CRAWLER_MAX_SLEEP_SEC = 5
 
 from .bilibili_config import *
 from .xhs_config import *

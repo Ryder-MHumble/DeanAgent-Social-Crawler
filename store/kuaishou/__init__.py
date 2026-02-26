@@ -28,6 +28,7 @@ import config
 from var import source_keyword_var
 
 from ._store_impl import *
+from store.supabase_store_impl import KuaishouSupabaseStoreImplement
 
 
 class KuaishouStoreFactory:
@@ -39,6 +40,7 @@ class KuaishouStoreFactory:
         "sqlite": KuaishouSqliteStoreImplement,
         "mongodb": KuaishouMongoStoreImplement,
         "excel": KuaishouExcelStoreImplement,
+        "supabase": KuaishouSupabaseStoreImplement,
     }
 
     @staticmethod

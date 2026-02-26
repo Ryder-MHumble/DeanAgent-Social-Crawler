@@ -29,6 +29,7 @@ from var import source_keyword_var
 
 from .weibo_store_media import *
 from ._store_impl import *
+from store.supabase_store_impl import WeiboSupabaseStoreImplement
 
 
 class WeibostoreFactory:
@@ -40,6 +41,7 @@ class WeibostoreFactory:
         "sqlite": WeiboSqliteStoreImplement,
         "mongodb": WeiboMongoStoreImplement,
         "excel": WeiboExcelStoreImplement,
+        "supabase": WeiboSupabaseStoreImplement,
     }
 
     @staticmethod

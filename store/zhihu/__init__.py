@@ -30,6 +30,7 @@ from ._store_impl import (ZhihuCsvStoreImplement,
                                           ZhihuSqliteStoreImplement,
                                           ZhihuMongoStoreImplement,
                                           ZhihuExcelStoreImplement)
+from store.supabase_store_impl import ZhihuSupabaseStoreImplement
 from tools import utils
 from var import source_keyword_var
 
@@ -43,6 +44,7 @@ class ZhihuStoreFactory:
         "sqlite": ZhihuSqliteStoreImplement,
         "mongodb": ZhihuMongoStoreImplement,
         "excel": ZhihuExcelStoreImplement,
+        "supabase": ZhihuSupabaseStoreImplement,
     }
 
     @staticmethod

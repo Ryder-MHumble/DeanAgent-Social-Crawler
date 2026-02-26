@@ -25,6 +25,7 @@ from model.m_baidu_tieba import TiebaComment, TiebaCreator, TiebaNote
 from var import source_keyword_var
 
 from ._store_impl import *
+from store.supabase_store_impl import TiebaSupabaseStoreImplement
 
 
 class TieBaStoreFactory:
@@ -36,6 +37,7 @@ class TieBaStoreFactory:
         "sqlite": TieBaSqliteStoreImplement,
         "mongodb": TieBaMongoStoreImplement,
         "excel": TieBaExcelStoreImplement,
+        "supabase": TiebaSupabaseStoreImplement,
     }
 
     @staticmethod

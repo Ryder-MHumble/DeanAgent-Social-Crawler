@@ -26,5 +26,6 @@ asyncmy>=0.2.10
 sqlalchemy>=2.0.43
 motor>=3.3.0
 openpyxl>=3.1.2
+supabase>=2.0.0
 pytest>=7.4.0
 pytest-asyncio>=0.21.0

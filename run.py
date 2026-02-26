@@ -26,7 +26,8 @@ except ImportError:
 
 # ==================== 配置区域 ====================
 # 关键词配置
-KEYWORDS = "中关村人工智能研究院,北京中关村学院"
+# 用精确的机构全称搜索，结合 RELEVANCE_MUST_CONTAIN 过滤确保只保存相关内容
+KEYWORDS = "中关村人工智能研究院,北京中关村学院,中关村学院"
 
 # 平台配置
 PLATFORMS = ["xhs", "dy", "bili", "wb"]  # xhs=小红书, dy=抖音, bili=B站, wb=微博
@@ -34,7 +35,7 @@ PLATFORMS = ["xhs", "dy", "bili", "wb"]  # xhs=小红书, dy=抖音, bili=B站, 
 # 爬取配置
 LOGIN_TYPE = "cookie"  # cookie 或 qrcode (优先使用 Cookie 登录)
 CRAWLER_TYPE = "search"
-SAVE_DATA_OPTION = "json"
+SAVE_DATA_OPTION = "supabase"
 ENABLE_COMMENTS = "yes"
 
 # 平台名称映射

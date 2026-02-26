@@ -20,6 +20,12 @@
 
 import os
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # mysql config
 MYSQL_DB_PWD = os.getenv("MYSQL_DB_PWD", "123456")
 MYSQL_DB_USER = os.getenv("MYSQL_DB_USER", "root")
@@ -81,4 +87,13 @@ postgres_db_config = {
     "host": POSTGRES_DB_HOST,
     "port": POSTGRES_DB_PORT,
     "db_name": POSTGRES_DB_NAME,
+}
+
+# supabase config
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")  # service_role key (secret)
+
+supabase_config = {
+    "url": SUPABASE_URL,
+    "key": SUPABASE_KEY,
 }
