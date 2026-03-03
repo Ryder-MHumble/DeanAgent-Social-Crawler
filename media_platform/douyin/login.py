@@ -60,6 +60,7 @@ class DouYinLogin(AbstractLogin):
         await self.popup_login_dialog()
 
         # select login type
+        original_login_type = config.LOGIN_TYPE
         if config.LOGIN_TYPE == "qrcode":
             await self.login_by_qrcode()
         elif config.LOGIN_TYPE == "phone":
@@ -80,8 +81,19 @@ class DouYinLogin(AbstractLogin):
         try:
             await self.check_login_state()
         except RetryError:
-            utils.logger.info("[DouYinLogin.begin] login failed please confirm ...")
-            sys.exit()
+            # If cookie login failed, try fallback to qrcode
+            if original_login_type == "cookie":
+                utils.logger.warning("[DouYinLogin.begin] ⚠️  Cookie login failed, falling back to QR code login...")
+                config.LOGIN_TYPE = "qrcode"
+                await self.login_by_qrcode()
+                try:
+                    await self.check_login_state()
+                except RetryError:
+                    utils.logger.info("[DouYinLogin.begin] QR code login also failed, please confirm ...")
+                    sys.exit()
+            else:
+                utils.logger.info("[DouYinLogin.begin] login failed please confirm ...")
+                sys.exit()
 
         # wait for redirect
         wait_redirect_seconds = 5

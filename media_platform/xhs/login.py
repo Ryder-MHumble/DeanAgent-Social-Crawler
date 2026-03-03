@@ -211,8 +211,10 @@ class XiaoHongShuLogin(AbstractLogin):
         await asyncio.sleep(wait_redirect_seconds)
 
     async def login_by_cookies(self):
-        """login xiaohongshu website by cookies"""
+        """login xiaohongshu website by cookies with auto-fallback to qrcode if invalid"""
         utils.logger.info("[XiaoHongShuLogin.login_by_cookies] Begin login xiaohongshu by cookie ...")
+
+        # Set cookies
         for key, value in utils.convert_str_cookie_to_dict(self.cookie_str).items():
             if key != "web_session":  # Only set web_session cookie attribute
                 continue
@@ -222,3 +224,26 @@ class XiaoHongShuLogin(AbstractLogin):
                 'domain': ".xiaohongshu.com",
                 'path': "/"
             }])
+
+        # Verify cookie validity by checking login state
+        await asyncio.sleep(2)  # Wait for page to load with cookies
+        await self.context_page.reload()  # Reload to apply cookies
+        await asyncio.sleep(2)
+
+        # Check if logged in by looking for profile element
+        try:
+            user_profile_selector = "xpath=//a[contains(@href, '/user/profile/')]//span[text()='我']"
+            is_logged_in = await self.context_page.is_visible(user_profile_selector, timeout=3000)
+
+            if is_logged_in:
+                utils.logger.info("[XiaoHongShuLogin.login_by_cookies] ✅ Cookie login successful!")
+                return
+            else:
+                utils.logger.warning("[XiaoHongShuLogin.login_by_cookies] ⚠️  Cookie appears invalid, profile element not found")
+        except Exception as e:
+            utils.logger.warning(f"[XiaoHongShuLogin.login_by_cookies] ⚠️  Cookie validation failed: {e}")
+
+        # Cookie invalid - fallback to QR code login
+        utils.logger.info("[XiaoHongShuLogin.login_by_cookies] 🔄 Cookie invalid, falling back to QR code login...")
+        config.LOGIN_TYPE = "qrcode"  # Switch login type
+        await self.login_by_qrcode()

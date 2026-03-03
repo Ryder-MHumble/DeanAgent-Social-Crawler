@@ -125,8 +125,15 @@ class BilibiliCrawler(AbstractCrawler):
                             continue
                 else:
                     await self.get_all_creator_details(config.BILI_CREATOR_ID_LIST)
+            elif config.CRAWLER_TYPE == "official_accounts":
+                pass  # skip keyword search, only run official accounts below
             else:
                 pass
+
+            # Official accounts: run when enabled or when type is official_accounts
+            if getattr(config, "ENABLE_OFFICIAL_ACCOUNTS_CRAWL", False) or config.CRAWLER_TYPE == "official_accounts":
+                await self.crawl_official_accounts()
+
             utils.logger.info("[BilibiliCrawler.start] Bilibili Crawler finished ...")
 
     async def search(self):
@@ -362,6 +369,32 @@ class BilibiliCrawler(AbstractCrawler):
                 utils.logger.error(f"[BilibiliCrawler.get_comments] may be been blocked, err:{e}")
                 # Propagate the exception to be caught by the main loop
                 raise
+
+    async def crawl_official_accounts(self) -> None:
+        """Crawl videos and comments from designated official Bilibili accounts.
+
+        source_keyword is set to "@{account_name}" so the data can be
+        distinguished from keyword-search results in the database.
+        """
+        accounts = getattr(config, "BILI_OFFICIAL_ACCOUNTS", [])
+        if not accounts:
+            return
+
+        utils.logger.info("[BilibiliCrawler.crawl_official_accounts] Begin crawling official accounts")
+        for account in accounts:
+            uid = account.get("uid")
+            name = account.get("name", str(uid))
+            if not uid:
+                continue
+
+            utils.logger.info(
+                f"[BilibiliCrawler.crawl_official_accounts] Crawling @{name} (uid={uid})"
+            )
+            # Mark source as official account — store/filter layers check this prefix
+            source_keyword_var.set(f"@{name}")
+            await self.get_creator_videos(int(uid))
+
+        utils.logger.info("[BilibiliCrawler.crawl_official_accounts] Official accounts crawl done")
 
     async def get_creator_videos(self, creator_id: int):
         """

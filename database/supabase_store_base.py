@@ -36,12 +36,32 @@ class SupabaseStoreBase:
     # platforms for which we've already pre-loaded existing IDs from DB this session
     _preloaded_platforms: set = set()
 
+    # Session counters: newly saved vs skipped vs filtered
+    _new_content_by_platform: dict[str, int] = {}
+    _new_comment_by_platform: dict[str, int] = {}
+    _skipped_dedup_by_platform: dict[str, int] = {}
+    _filtered_irrelevant_by_platform: dict[str, int] = {}
+    _filtered_low_engagement_by_platform: dict[str, int] = {}
+    _filtered_short_comment_by_platform: dict[str, int] = {}
+
     def __init__(self, platform: str):
         self.platform = platform
         if platform not in self._relevant_content_ids_by_platform:
             self._relevant_content_ids_by_platform[platform] = set()
         if platform not in self._seen_content_ids_by_platform:
             self._seen_content_ids_by_platform[platform] = set()
+        if platform not in self._new_content_by_platform:
+            self._new_content_by_platform[platform] = 0
+        if platform not in self._new_comment_by_platform:
+            self._new_comment_by_platform[platform] = 0
+        if platform not in self._skipped_dedup_by_platform:
+            self._skipped_dedup_by_platform[platform] = 0
+        if platform not in self._filtered_irrelevant_by_platform:
+            self._filtered_irrelevant_by_platform[platform] = 0
+        if platform not in self._filtered_low_engagement_by_platform:
+            self._filtered_low_engagement_by_platform[platform] = 0
+        if platform not in self._filtered_short_comment_by_platform:
+            self._filtered_short_comment_by_platform[platform] = 0
 
     @property
     def _relevant_content_ids(self) -> Set[str]:
@@ -92,16 +112,24 @@ class SupabaseStoreBase:
         """
         Check if content actually mentions the target entities.
         Returns True if filter is disabled or content matches.
+        Returns False if content matches an exclusion keyword.
         """
         if not getattr(config, "ENABLE_RELEVANCE_FILTER", False):
             return True
+
+        # Combine title + description for matching
+        text = f"{title or ''} {description or ''}".lower()
+
+        # Exclusion keywords take priority — reject if any match
+        exclude_keywords = getattr(config, "RELEVANCE_EXCLUDE_KEYWORDS", [])
+        for keyword in exclude_keywords:
+            if keyword.lower() in text:
+                return False
 
         must_contain = getattr(config, "RELEVANCE_MUST_CONTAIN", [])
         if not must_contain:
             return True
 
-        # Combine title + description for matching
-        text = f"{title or ''} {description or ''}".lower()
         for keyword in must_contain:
             if keyword.lower() in text:
                 return True
@@ -130,19 +158,42 @@ class SupabaseStoreBase:
             )
             # NOTE: content_id is also in _relevant_content_ids (set during preload or
             # first-time save), so its comments can still be saved.
+            self._skipped_dedup_by_platform[self.platform] += 1
             return
 
-        # Relevance filter: skip content that doesn't mention target entities
         title = content_item.get("title", "")
         description = content_item.get("description", "")
-        if not self._is_content_relevant(title, description):
-            utils.logger.info(
-                f"[SupabaseStore] SKIPPED (irrelevant) {self.platform}/{content_id}: "
-                f"{(title or description or '')[:60]}"
-            )
-            # Mark seen so we don't re-evaluate on future keyword searches
-            self._seen_content_ids.add(content_id)
-            return
+        source_keyword = content_item.get("source_keyword", "")
+
+        # Official account content: bypass relevance + engagement filters entirely.
+        # source_keyword starts with "@" when content comes from a tracked official account.
+        is_official_account = source_keyword.startswith("@")
+
+        if not is_official_account:
+            # Relevance filter: skip content that doesn't mention target entities
+            if not self._is_content_relevant(title, description):
+                utils.logger.info(
+                    f"[SupabaseStore] SKIPPED (irrelevant) {self.platform}/{content_id}: "
+                    f"{(title or description or '')[:60]}"
+                )
+                # Mark seen so we don't re-evaluate on future keyword searches
+                self._seen_content_ids.add(content_id)
+                self._filtered_irrelevant_by_platform[self.platform] += 1
+                return
+
+            # Engagement filter: skip low-quality / zero-interaction posts
+            min_engagement = getattr(config, "MIN_CONTENT_ENGAGEMENT", 0)
+            if min_engagement > 0:
+                liked = int(content_item.get("liked_count", 0) or 0)
+                comments = int(content_item.get("comment_count", 0) or 0)
+                if liked + comments < min_engagement:
+                    utils.logger.info(
+                        f"[SupabaseStore] SKIPPED (low engagement: {liked}👍 {comments}💬) "
+                        f"{self.platform}/{content_id}: {(title or description or '')[:50]}"
+                    )
+                    self._seen_content_ids.add(content_id)
+                    self._filtered_low_engagement_by_platform[self.platform] += 1
+                    return
 
         # Mark as seen and relevant
         self._seen_content_ids.add(content_id)
@@ -179,6 +230,7 @@ class SupabaseStoreBase:
             .upsert(row, on_conflict="platform,content_id")
             .execute()
         )
+        self._new_content_by_platform[self.platform] += 1
         utils.logger.info(
             f"[SupabaseStore] Upserted content {self.platform}/{content_id}"
         )
@@ -205,6 +257,18 @@ class SupabaseStoreBase:
                     f"[SupabaseStore] SKIP comment {self.platform}/{comment_id}: "
                     f"parent content {parent_content_id} not relevant"
                 )
+                return
+
+        # Comment length filter: skip very short / spam comments
+        min_len = getattr(config, "MIN_COMMENT_LENGTH", 0)
+        if min_len > 0:
+            comment_text = comment_item.get("content", "") or ""
+            if len(comment_text.strip()) < min_len:
+                utils.logger.debug(
+                    f"[SupabaseStore] SKIP comment {self.platform}/{comment_id}: "
+                    f"too short ({len(comment_text.strip())} chars)"
+                )
+                self._filtered_short_comment_by_platform[self.platform] += 1
                 return
 
         sb = get_supabase()
@@ -234,6 +298,7 @@ class SupabaseStoreBase:
             .upsert(row, on_conflict="platform,comment_id")
             .execute()
         )
+        self._new_comment_by_platform[self.platform] += 1
         utils.logger.info(
             f"[SupabaseStore] Upserted comment {self.platform}/{comment_id}"
         )
@@ -275,6 +340,42 @@ class SupabaseStoreBase:
             f"[SupabaseStore] Upserted creator {self.platform}/{user_id}"
         )
         return result
+
+    # ------------------------------------------------------------------
+    # Session summary
+    # ------------------------------------------------------------------
+    @classmethod
+    def get_session_summary(cls, platform: str) -> dict:
+        """Return a dict with new/skipped/filtered counts for a platform this session."""
+        return {
+            "new_content": cls._new_content_by_platform.get(platform, 0),
+            "new_comment": cls._new_comment_by_platform.get(platform, 0),
+            "skipped_dedup": cls._skipped_dedup_by_platform.get(platform, 0),
+            "filtered_irrelevant": cls._filtered_irrelevant_by_platform.get(platform, 0),
+            "filtered_low_engagement": cls._filtered_low_engagement_by_platform.get(platform, 0),
+            "filtered_short_comment": cls._filtered_short_comment_by_platform.get(platform, 0),
+        }
+
+    @classmethod
+    def print_session_summary(cls, platform: str) -> None:
+        """Print a human-readable summary for a platform."""
+        s = cls.get_session_summary(platform)
+        platform_names = {
+            "xhs": "小红书", "dy": "抖音", "bili": "Bilibili",
+            "wb": "微博", "zhihu": "知乎", "ks": "快手", "tieba": "贴吧",
+        }
+        name = platform_names.get(platform, platform.upper())
+        print(
+            f"\n{'='*60}\n"
+            f"[{name}] 本次爬取统计\n"
+            f"  ✅ 新增内容:   {s['new_content']} 条\n"
+            f"  💬 新增评论:   {s['new_comment']} 条\n"
+            f"  ⏭️  已有跳过:   {s['skipped_dedup']} 条（数据库去重）\n"
+            f"  🚫 无关过滤:   {s['filtered_irrelevant']} 条（不含目标关键词）\n"
+            f"  📉 低互动过滤: {s['filtered_low_engagement']} 条（互动量不足）\n"
+            f"  ✂️  短评过滤:   {s['filtered_short_comment']} 条（评论过短）\n"
+            f"{'='*60}"
+        )
 
     # ------------------------------------------------------------------
     # Bilibili-specific: contacts

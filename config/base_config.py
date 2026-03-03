@@ -38,11 +38,44 @@ RELEVANCE_MUST_CONTAIN = [
     "中关村AI研究院",
     "智源",
     "河套",
-    "创智"
+    "创智",
     "三小只",
     "三小智",
-    "博"
 ]
+
+# Content containing ANY of these strings will be excluded, even if it passes the above filter.
+# Use this to block obvious spam/ad patterns.
+RELEVANCE_EXCLUDE_KEYWORDS: list[str] = [
+    # Examples (uncomment or add your own):
+    # "招聘", "广告", "转发抽奖", "点赞送福利",
+]
+
+# Minimum total engagement (liked_count + comment_count) for a post to be saved.
+# Posts with fewer combined interactions are treated as low-quality / spam and skipped.
+# Set to 0 to disable.
+MIN_CONTENT_ENGAGEMENT = 2
+
+# Minimum character length for a comment to be saved.
+# Comments shorter than this (e.g. "哈哈", "666", single emoji) are skipped.
+# Set to 0 to disable.
+MIN_COMMENT_LENGTH = 5
+
+# ==================== 官方账号爬取配置 ====================
+# 是否在每次爬取时额外抓取指定官方账号的内容（在关键词搜索之后运行）
+# 官方账号内容会绕过相关性过滤，source_keyword 记录为 "@{账号名称}" 以区分来源
+ENABLE_OFFICIAL_ACCOUNTS_CRAWL = True
+
+# 小红书官方账号列表（爬取其所有帖子和评论）
+XHS_OFFICIAL_ACCOUNTS = [
+    {"user_id": "5bebb72379896c00014f3295", "name": "北京中关村学院"},
+    {"user_id": "68685a82000000001d009ebb", "name": "上海创智学院"},
+]
+
+# Bilibili 官方账号列表（爬取其所有视频和评论）
+BILI_OFFICIAL_ACCOUNTS = [
+    {"uid": 85843243, "name": "北京中关村学院"},
+]
+
 LOGIN_TYPE = "qrcode"  # qrcode or phone or cookie
 COOKIES = ""
 CRAWLER_TYPE = (

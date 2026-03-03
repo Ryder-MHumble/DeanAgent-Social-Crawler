@@ -117,8 +117,14 @@ class XiaoHongShuCrawler(AbstractCrawler):
             elif config.CRAWLER_TYPE == "creator":
                 # Get creator's information and their notes and comments
                 await self.get_creators_and_notes()
+            elif config.CRAWLER_TYPE == "official_accounts":
+                pass  # skip keyword search, only run official accounts below
             else:
                 pass
+
+            # Official accounts: run when enabled or when type is official_accounts
+            if getattr(config, "ENABLE_OFFICIAL_ACCOUNTS_CRAWL", False) or config.CRAWLER_TYPE == "official_accounts":
+                await self.crawl_official_accounts()
 
             utils.logger.info("[XiaoHongShuCrawler.start] Xhs Crawler finished ...")
 
@@ -220,6 +226,42 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 note_ids.append(note_item.get("note_id"))
                 xsec_tokens.append(note_item.get("xsec_token"))
             await self.batch_get_note_comments(note_ids, xsec_tokens)
+
+    async def crawl_official_accounts(self) -> None:
+        """Crawl posts and comments from designated official XHS accounts.
+
+        source_keyword is set to "@{account_name}" so the data can be
+        distinguished from keyword-search results in the database.
+        """
+        accounts = getattr(config, "XHS_OFFICIAL_ACCOUNTS", [])
+        if not accounts:
+            return
+
+        utils.logger.info("[XiaoHongShuCrawler.crawl_official_accounts] Begin crawling official accounts")
+        for account in accounts:
+            user_id = account.get("user_id", "")
+            name = account.get("name", user_id)
+            if not user_id:
+                continue
+
+            utils.logger.info(
+                f"[XiaoHongShuCrawler.crawl_official_accounts] Crawling @{name} (user_id={user_id})"
+            )
+            # Mark source as official account — store/filter layers check this prefix
+            source_keyword_var.set(f"@{name}")
+
+            all_notes_list = await self.xhs_client.get_all_notes_by_creator(
+                user_id=user_id,
+                crawl_interval=float(config.CRAWLER_MAX_SLEEP_SEC),
+                callback=self.fetch_creator_notes_detail,
+            )
+
+            note_ids = [n.get("note_id") for n in all_notes_list if n.get("note_id")]
+            xsec_tokens = [n.get("xsec_token", "") for n in all_notes_list]
+            if note_ids:
+                await self.batch_get_note_comments(note_ids, xsec_tokens)
+
+        utils.logger.info("[XiaoHongShuCrawler.crawl_official_accounts] Official accounts crawl done")
 
     async def fetch_creator_notes_detail(self, note_list: List[Dict]):
         """Concurrently obtain the specified post list and save the data"""

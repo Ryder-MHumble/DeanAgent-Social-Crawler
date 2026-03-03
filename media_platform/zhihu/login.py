@@ -113,8 +113,10 @@ class ZhiHuLogin(AbstractLogin):
         await asyncio.sleep(wait_redirect_seconds)
 
     async def login_by_cookies(self):
-        """login zhihu website by cookies"""
+        """login zhihu website by cookies with auto-fallback to qrcode if invalid"""
         utils.logger.info("[ZhiHu.login_by_cookies] Begin login zhihu by cookie ...")
+
+        # Set cookies
         for key, value in utils.convert_str_cookie_to_dict(self.cookie_str).items():
             await self.browser_context.add_cookies([{
                 'name': key,
@@ -122,3 +124,22 @@ class ZhiHuLogin(AbstractLogin):
                 'domain': ".zhihu.com",
                 'path': "/"
             }])
+
+        # Verify cookie validity
+        await asyncio.sleep(2)
+        await self.context_page.reload()
+        await asyncio.sleep(2)
+
+        # Check if logged in
+        try:
+            is_logged_in = await self.check_login_state()
+            if is_logged_in:
+                utils.logger.info("[ZhiHu.login_by_cookies] ✅ Cookie login successful!")
+                return
+        except Exception as e:
+            utils.logger.warning(f"[ZhiHu.login_by_cookies] ⚠️  Cookie validation failed: {e}")
+
+        # Cookie invalid - fallback to QR code login
+        utils.logger.info("[ZhiHu.login_by_cookies] 🔄 Cookie invalid, falling back to QR code login...")
+        config.LOGIN_TYPE = "qrcode"
+        await self.login_by_qrcode()

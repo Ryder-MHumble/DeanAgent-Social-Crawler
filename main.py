@@ -111,6 +111,14 @@ async def main() -> None:
 
     _flush_excel_if_needed()
 
+    # Print per-platform save/skip/filter summary (only for Supabase mode)
+    if config.SAVE_DATA_OPTION == "supabase":
+        try:
+            from database.supabase_store_base import SupabaseStoreBase
+            SupabaseStoreBase.print_session_summary(config.PLATFORM)
+        except Exception as e:
+            print(f"[Main] Could not print session summary: {e}")
+
     # Generate wordcloud after crawling is complete
     # Only for JSON save mode
     await _generate_wordcloud_if_needed()
